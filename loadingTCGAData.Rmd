@@ -131,6 +131,7 @@ save(data_3, file = "COAD_coding.RData")
 load("BRCA_coding.RData")
 load("other_coding.RData")
 load("COAD_coding.RData")
+"hi"
 save(data_merged, file = "merged_data.RData")
 load("merged_data.RData")
 ```
@@ -231,6 +232,9 @@ write.csv(filtered_training_set, "filtered_training_set.csv", row.names = FALSE)
 ```{r}
 setequal(training_set$project_id, testing_set$project_id)
 ```
+
+# This is the additional biological-related processing I could do. Its too hard so not
+# doing it for right now
 
 ```{r}
 # combine the datasets and then extract clinical data
