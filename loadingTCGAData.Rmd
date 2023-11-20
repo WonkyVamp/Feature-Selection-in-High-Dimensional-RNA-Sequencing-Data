@@ -1,0 +1,304 @@
+---
+title: "loadingTCGAData"
+author: "Soren Dunn"
+date: "2023-11-15"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Load necessary libraries
+library(TCGAbiolinks)
+library(SummarizedExperiment)
+library(biomaRt)
+library(EDASeq)
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install("SEtools")
+library(SEtools)
+```
+
+```{r}
+query = GDCquery(
+    project = "TCGA-ACC",
+    data.category = "Proteome Profiling",
+    sample.type = "Primary Tumor", 
+    legacy = FALSE)
+
+manifest <- getManifest(query)
+TCGAbiolinks:::GDCdownload.aux(
+    server = "https://api.gdc.cancer.gov/data/",
+    manifest = manifest,
+    name = "test.tar.gz",
+    path = "Test"
+)
+```
+
+```{r}
+# Load the different data in in chunks since its too much to load in all at once.
+
+# Define parameters for GDCquery
+projects <- c("BRCA")
+data_category <- "Transcriptome Profiling"
+data_type <- "Gene Expression Quantification"
+experimental_strategy <- "RNA-Seq"
+sample_type <- "Primary Tumor"
+
+# Query and download data for each project (i.e., type of cancer)
+query <- GDCquery(project = projects,
+                  data_category,
+                  data.type = data_type,
+                  experimental.strategy = experimental_strategy,
+                  sample.type = sample_type)
+
+# Download and prepare data
+data <- GDCdownload(query)
+#tdata <- TCGAprepare(data)
+data <- GDCprepare(query = query, save = TRUE, save.filename = "TCGA-BRCA.rda")
+```
+
+```{r}
+data$gender[is.na(data$gender)] <- "Male"
+data <- data[,data$gender == 'female']
+data <- data[rowData(data)$gene_type == "protein_coding"]
+save(data, file = "BRCA_coding.RData")
+```
+
+```{r}
+# Load in a couples of the other datasets
+# Define parameters for GDCquery
+projects <- c("TCGA-OV","TCGA-LUAD","TCGA-THCA") #"TCGA-COAD"
+# legacy <- TRUE
+data_category <- "Transcriptome Profiling"
+data_type <- "Gene Expression Quantification"
+# platform <- "Illumina HiSeq"
+# file_type <- "results"
+experimental_strategy <- "RNA-Seq"
+sample_type <- "Primary Tumor"
+
+# Query and download data for each project (i.e., type of cancer)
+query <- GDCquery(project = projects,
+                  data_category,
+                  data.type = data_type,
+                  experimental.strategy = experimental_strategy,
+                  sample.type = sample_type)
+
+# Download and prepare data
+data_2 <- GDCdownload(query)
+#tdata <- TCGAprepare(data)
+data_2 <- GDCprepare(query = query, save = TRUE, save.filename = "TCGA-other.rda")
+```
+
+```{r}
+data_2$gender[is.na(data_2$gender)] <- "Male"
+data_2 <- data_2[,data_2$gender == 'female']
+data_2 <- data_2[rowData(data_2)$gene_type == "protein_coding"]
+save(data_2, file = "other_coding.RData")
+```
+
+```{r}
+# Subset the very last of the data
+# Define parameters for GDCquery
+projects <- c("TCGA-COAD")
+data_category <- "Transcriptome Profiling"
+data_type <- "Gene Expression Quantification"
+experimental_strategy <- "RNA-Seq"
+sample_type <- "Primary Tumor"
+
+# Query and download data for each project (i.e., type of cancer)
+query <- GDCquery(project = projects,
+                  data_category,
+                  data.type = data_type,
+                  experimental.strategy = experimental_strategy,
+                  sample.type = sample_type)
+
+# Download and prepare data
+data_3 <- GDCdownload(query)
+#tdata <- TCGAprepare(data)
+data_3 <- GDCprepare(query = query, save = TRUE, save.filename = "TCGA-last.rda")
+```
+
+```{r}
+data_3$gender[is.na(data_3$gender)] <- "Male"
+data_3 <- data_3[,data_3$gender == 'female']
+data_3 <- data_3[rowData(data_3)$gene_type == "protein_coding"]
+save(data_3, file = "COAD_coding.RData")
+```
+
+```{r}
+# Load back in the subsetted data
+load("BRCA_coding.RData")
+load("other_coding.RData")
+load("COAD_coding.RData")
+save(data_merged, file = "merged_data.RData")
+load("merged_data.RData")
+```
+
+```{r}
+corr_array_1 <- TCGAanalyze_Preprocessing(data, filename = "corrplot_1.png", width = 1000, height = 1000)
+corr_array_2 <- TCGAanalyze_Preprocessing(data_2, filename = "corrplot_2.png", width = 1000, height = 1000)
+corr_array_3 <- TCGAanalyze_Preprocessing(data_3, filename = "corrplot_3.png", width = 1000, height = 1000)
+combined_corr_array <- cbind(corr_array_1, corr_array_2, corr_array_3)
+normalized <- TCGAanalyze_Normalization(combined_corr_array, TCGAbiolinks:: geneInfoHT)
+
+# Take the transpose so that we get the data into the familiar format where
+# features are columns and the individual samples are rows
+normalized_not_filtered <- data.frame(t(normalized))
+```
+
+```{r}
+# First, create a lookup table for sample names to project IDs
+sample_to_project_id <- data.frame(
+  sample = c(data$barcode, data_2$barcode, data_3$barcode),
+  project_id = c(data$project_id, data_2$project_id, data_3$project_id)
+)
+
+# Ensure that the sample_to_project_id dataframe does not have duplicate entries for samples
+sample_to_project_id <- unique(sample_to_project_id)
+
+normalized_not_filtered <- cbind(sample = rownames(normalized_not_filtered,), normalized_not_filtered)
+head(normalized_not_filtered$sample)
+head(sample_to_project_id$sample)
+
+normalized_not_filtered_with_pid <- merge(
+  normalized_not_filtered,
+  sample_to_project_id,
+  by.x = "sample",  # 'row.names' should match the row names of normalized_not_filtered
+  by.y = "sample",
+  all.x = TRUE,  # Keep all rows from normalized_not_filtered
+  all.y = TRUE
+)
+
+normalized_not_filtered <- normalized_not_filtered_with_pid
+write.csv(normalized_not_filtered,"normalized_data_all.csv")
+```
+
+```{r}
+# Assume `normalized_not_filtered` is your original dataframe
+set.seed(123) # Set a seed for reproducibility
+
+total_rows <- nrow(normalized_not_filtered)
+sample_size <- ceiling(0.30 * total_rows) # Calculate 30% of the total number of rows
+
+# Sample row indices without replacement
+sample_indices <- sample(1:total_rows, size = sample_size, replace = FALSE)
+
+# Save the names of the rows if row names exist
+row_names <- rownames(normalized_not_filtered)
+selected_row_names <- row_names[sample_indices]
+
+# Create the training and testing sets
+testing_set <- normalized_not_filtered[sample_indices, ]
+training_set <- normalized_not_filtered[-sample_indices, ] # Exclude the sampled rows for the training set
+
+write.csv(selected_row_names, "testing_rows.csv", row.names = FALSE)
+
+# Similarly, save the training and testing sets
+write.csv(testing_set, "normalized_testing_set.csv", row.names = FALSE)
+write.csv(training_set, "normalized_training_set.csv", row.names = FALSE)
+dim(training_set)
+```
+
+```{r}
+filtered <- TCGAanalyze_Filtering(normalized, method = 'quantile')
+filtered_df <- data.frame(t(filtered))
+
+filtered_df <- cbind(sample = rownames(filtered_df,), filtered_df)
+
+filtered_df <- merge(
+  filtered_df,
+  sample_to_project_id,
+  by.x = "sample",  # 'row.names' should match the row names of normalized_not_filtered
+  by.y = "sample",
+  all.x = TRUE,  # Keep all rows from normalized_not_filtered
+  all.y = TRUE
+)
+
+# Save the names of the rows if row names exist
+row_names <- normalized_not_filtered$sample
+selected_row_names <- row_names[sample_indices]
+
+# Create the training and testing sets
+filtered_testing_set <- filtered_df[filtered_df$sample %in% selected_row_names, ]
+filtered_training_set <- filtered_df[!filtered_df$sample %in% selected_row_names, ] # Exclude the sampled rows for the training set
+
+# Similarly, save the training and testing sets
+write.csv(filtered_testing_set, "filtered_testing_set.csv", row.names = FALSE)
+write.csv(filtered_training_set, "filtered_training_set.csv", row.names = FALSE)
+```
+
+```{r}
+setequal(training_set$project_id, testing_set$project_id)
+```
+
+```{r}
+# combine the datasets and then extract clinical data
+data_merged <- mergeSEs( list(se1=data, se2=data_2, se3 = data_3) )
+clinical <- data.frame(coding@colData)
+
+# Check how many tumor and control sample are there:
+## data are stored under "definition" column in the clinical dataset.
+table(clinical$definition)
+
+# to see whether all rows of clinical are present in rna datset
+all(rownames(clinical) %in% colnames(filtered))
+
+# whether they are in the same order:
+all(rownames(clinical) == colnames(filtered))
+
+# if not reorder them by:
+filtered <- filtered[, rownames(clinical)]
+all(rownames(clinical) == colnames(filtered))
+
+rna <- filtered
+clinical$project_id
+```
+
+```{r}
+#_______Making_Expression_Object__________#
+
+#We will use the column “project_id”, as the grouping variable for gene expression analysis. 
+
+# replace spaces with "_" in levels of project_id column
+clinical$project_id <-  gsub(" ", "_", clinical$project_id)
+
+# making the project_id column as factor
+clinical$project_id <- as.factor(clinical$project_id)
+# relevling factor to ensure tumors would be compared to normal tissue.
+levels(clinical$project_id)
+#
+clinical$project_id <- relevel(clinical$project_id, ref = "Solid_Tissue_Normal")
+
+# Making DESeqDataSet object which stores all experiment data
+dds <- DESeqDataSetFromMatrix(countData = rna,
+                              colData = clinical,
+                              design = ~ project_id)
+
+# prefilteration: it is not necessary but recommended to filter out low expressed genes
+
+keep <- rowSums(counts(dds)) >= 10
+dds <- dds[keep,]
+
+# data tranfromation
+vsd <- vst(dds, blind=FALSE)
+
+# making PC object
+p <- pca(assay(vsd), metadata = colData(vsd), removeVar = 0.1)
+
+# create PCA plot for PCA1 and PCA2
+biplot(p, colby = "project_id", lab = NULL, legendPosition = 'right')
+```
+
+```{r}
+# Fol all top 10 possible combination 
+pairsplot(p,
+          components = getComponents(p, c(1:10)),
+          triangle = TRUE, trianglelabSize = 12,
+          hline = 0, vline = 0,
+          pointSize = 0.4,
+          gridlines.major = FALSE, gridlines.minor = FALSE,
+          colby = 'project_id',
+          title = 'Pairs plot', plotaxes = FALSE,
+          margingaps = unit(c(-0.01, -0.01, -0.01, -0.01), 'cm'))
+```
