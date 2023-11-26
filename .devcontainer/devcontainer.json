@@ -1,0 +1,12 @@
+	},
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"python.pythonPath": "/usr/local/bin/python"
+			}
+		}
+	},
+	"forwardPorts": [
+		5000
+	]
+}

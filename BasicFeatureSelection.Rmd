@@ -1,0 +1,121 @@
+---
+title: "Basic Feature Selection"
+author: "Soren Dunn"
+date: "2023-11-20"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Load necessary libraries
+library(ggplot2)
+library(caret)
+```
+
+Here I will try some simple approaches to feature selection with this dataset:
+PCA, Variance Thresholding, UMAP and mutual information
+
+```{r}
+filtered_df <- read.csv("TCGAdata/filtered_training_set.csv")
+head(filtered_df)
+```
+
+We will use the following simple model training pipeline to evaluate all the feature selection methods:
+
+First, let's perform PCA on the data:
+
+```{r}
+# Assume 'filtered_df' contains only gene expression data, 'sample', and 'project_id' columns
+# Remove the non-gene columns before PCA
+gene_data <- filtered_df[, !(names(filtered_df) %in% c("sample", "project_id"))]
+
+# Perform PCA and scale the data
+pca_result <- prcomp(gene_data, scale. = TRUE, center = TRUE)
+
+# Summarize the importance of components
+importance_of_pcs <- summary(pca_result)$importance
+
+# If you want to plot only the top 100 Principal Components
+top_n <- 100
+importance_top100 <- importance_of_pcs[, 1:top_n]
+
+# Create a data frame for plotting
+plot_df <- data.frame(PC = 1:top_n, VarianceExplained = importance_top100["Proportion of Variance", ])
+
+# Plot the importance of the top 100 principal components
+ggplot(plot_df, aes(x = PC, y = VarianceExplained)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  xlab("Principal Component") +
+  ylab("Proportion of Variance Explained") +
+  ggtitle("Importance of Top 100 Principal Components")
+```
+
+Since most of the variation is explained in the first 25 principle components let's try training a model on just them.
+
+!!!!!!! Code to select first 25 principle components !!!!!!!!!!
+
+## Variance Thresholding
+
+```{r}
+# Define columns to exclude
+exclude_columns <- c("sample", "project_id")
+
+# Get gene columns by excluding the defined columns
+gene_columns <- filtered_df[, !(names(filtered_df) %in% exclude_columns)]
+
+# Calculate variance for each gene using sapply
+variances <- sapply(gene_columns, var)
+
+# Sort variances in descending order
+sorted_variances <- sort(variances, decreasing = TRUE)
+
+# Select the top 100 variances
+top100_variances <- head(sorted_variances, 100)
+
+# Create a data frame for plotting
+variance_df <- data.frame(Gene = names(top100_variances), Variance = top100_variances)
+
+# Plot Top 100 variances to visualize and decide on a threshold
+library(ggplot2)
+ggplot(variance_df, aes(x = reorder(Gene, -Variance), y = Variance)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
+  labs(x = "Genes", y = "Variance", title = "Top 100 Variances of Genes")
+```
+
+```{r}
+library(knockoff)
+
+# Let's first try with LASSO
+default_LASSO = stat.glmnet_coefdiff
+multinom_LASSO = function(X, X_k, y) default_LASSO(X, X_k, y, family = "multinomial", nlambda = 1)
+factor_project_id <- factor(filtered_df[["project_id"]])
+result = knockoff.filter(gene_columns, factor_project_id, statistic=multinom_LASSO)
+```
+
+```{r}
+rand_forest_result = knockoff.filter(gene_columns, factor_project_id, statistic=stat.random_forest)
+```
+
+## Stability selection
+
+```{r}
+library(knockoff)
+factor_project_id <- factor(filtered_df[["project_id"]])
+result = knockoff.filter(gene_columns, factor_project_id, statistic=stat.stability_selection)
+```
+
+```{r}
+
+```
+
+## Correlation Thresholding
+
+## Variance Thresholding
+
+## Mutual Information
+
+
+
