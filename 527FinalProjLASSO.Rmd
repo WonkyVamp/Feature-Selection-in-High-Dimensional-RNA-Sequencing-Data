@@ -1,0 +1,119 @@
+---
+title: "527FinalProj"
+output: html_document
+date: "2023-11-16"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## PCA
+```{r}
+data = read.csv("filtered_training_set.csv", header = TRUE)
+```
+
+```{r}
+#Remove sample and last columns for cancer types
+x1 = data[,c(3:ncol(data)-1)]
+```
+
+```{r}
+# Generate Two Dimensional PCA graph
+library(FactoMineR)
+result = PCA(x1)
+```
+
+```{r}
+pca_x = prcomp(x1, scale = TRUE, center = TRUE)
+```
+
+```{r}
+pca_x$var = (pca_x$sdev)^2
+pca_x$percentVar = (pca_x$var)/sum(pca_x$var)*100
+pca_x$cumPerVar = cumsum(pca_x$percentVar)
+```
+
+```{r}
+plot(pca_x$cumPerVar, xlab = "Principal Component",
+     ylab = "Cumulative Proportion of Variance Explained", type = "b", xlim = c(0,12))
+```
+
+```{r}
+# Select first 12 pca components
+xnew = pca_x$x[,1:12]
+```
+
+```{r}
+# Fit Multinomial model
+y = factor(data[,ncol(data)])
+library(nnet)
+mfit = multinom(y ~ xnew)
+
+```
+
+```{r}
+# Test for Accuracy
+most_likely <- apply(mfit$fitted.values, 1, which.max)
+pred_cancer <- levels(y)[most_likely]
+sum(pred_cancer == y)/nrow(xnew)
+```
+```{r}
+# PCA AUC value
+library(pROC)
+multiclass.roc(y, mfit$fitted.values)
+```
+
+
+## LASSO Variable
+```{r}
+# First LASSO Model
+library(glmnet)
+y = factor(data[,ncol(data)])
+cvfit = cv.glmnet(as.matrix(x1), y, family = "multinomial", type.multinomial = "grouped")
+```
+
+
+```{r}
+# Multinomial Deviance Plot
+plot(cvfit)
+```
+
+```{r}
+#The range for best Lambda
+c(lambda.min = log(cvfit$lambda.min), lambda.1se = log(cvfit$lambda.1se))
+```
+
+```{r}
+# The select non zero variables
+temp <- coef(cvfit, s = cvfit$lambda.1se )
+beta <- Reduce(cbind, temp)
+beta <- beta[apply(beta != 0, 1, any),]
+colnames(beta) <- names(temp)
+beta
+```
+
+```{r}
+#Make a prediction for first 100 sample in train data
+predict(cvfit, newx = as.matrix(x1[1:100,]), s = "lambda.min", type = "class")
+```
+
+```{r}
+# Second Lasso Model
+cvfit2 = cv.glmnet(as.matrix(x1), y, family = "multinomial", type.multinomial = "grouped", type.measure="class")
+```
+
+```{r}
+# Missclassfication error is 0
+plot(cvfit2)
+```
+
+```{r}
+temp2 <- coef(cvfit2, s = cvfit2$lambda.1se)
+beta2 <- Reduce(cbind, temp2)
+beta2 <- beta2[apply(beta2 != 0, 1, any),]
+colnames(beta2) <- names(temp2)
+beta2
+```
+
+
