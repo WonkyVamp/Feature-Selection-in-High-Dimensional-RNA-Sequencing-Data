@@ -1,3 +1,7 @@
 "BestAccuracy","BestKappa","BestAccuracySD","BestKappaSD","HyperParameters","Model"
 0.997032630498163,0.995848519324535,0.00363426311213462,0.00508305929536626,": 1e-04","trained_models/pca_top_25_multinom_cv_5foldCV.RData"
 0.994054673736824,0.991656694420534,0.00557030373367471,0.00781737584658395,"eta: 0.4, max_depth: 1, gamma: 0, colsample_bytree: 0.6, min_child_weight: 1, subsample: 0.75, nrounds: 150","trained_models/pca_top_25_xgbTree_cv_5foldCV.RData"
+0.783869416553165,0.702415099694147,0.0202876245938055,0.0234532192486423,": 0.1","trained_models/knockoff_chi_squared_genes_multinom_cv_5foldCV.RData"
+0.828971831827915,0.755805480070527,0.0204779052059449,0.029792987150777,"eta: 0.3, max_depth: 3, gamma: 0, colsample_bytree: 0.6, min_child_weight: 1, subsample: 0.5, nrounds: 100","trained_models/knockoff_chi_squared_genes_xgbTree_cv_5foldCV.RData"
+0.814122588968515,0.735679243287291,0.00685280558769217,0.00875135349150933,": 0","trained_models/knockoff_correlation_genes_multinom_cv_5foldCV.RData"
+0.847989434479391,0.782993879257495,0.016226021314259,0.0225596068380896,"eta: 0.4, max_depth: 3, gamma: 0, colsample_bytree: 0.8, min_child_weight: 1, subsample: 1, nrounds: 150","trained_models/knockoff_correlation_genes_xgbTree_cv_5foldCV.RData"

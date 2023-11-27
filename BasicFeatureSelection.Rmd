@@ -13,7 +13,7 @@ library(caret)
 ```
 
 Here I will try some simple approaches to feature selection with this dataset:
-PCA, Variance Thresholding, UMAP and mutual information
+PCA, variance thresholding, correlation thresholding, and knock-off based approaches in combination with correlation thresholding.
 
 ```{r}
 filtered_df <- read.csv("TCGAdata/filtered_training_set.csv")
@@ -49,11 +49,11 @@ ggplot(plot_df, aes(x = PC, y = VarianceExplained)) +
   xlab("Principal Component") +
   ylab("Proportion of Variance Explained") +
   ggtitle("Importance of Top 100 Principal Components")
+
+top_25_pca <- pca_result[1:25]
+
+write.csv
 ```
-
-Since most of the variation is explained in the first 25 principle components let's try training a model on just them.
-
-!!!!!!! Code to select first 25 principle components !!!!!!!!!!
 
 ## Variance Thresholding
 
@@ -71,7 +71,7 @@ variances <- sapply(gene_columns, var)
 sorted_variances <- sort(variances, decreasing = TRUE)
 
 # Select the top 100 variances
-top100_variances <- head(sorted_variances, 100)
+top100_variances <- head(sorted_variances, 1000)
 
 # Create a data frame for plotting
 variance_df <- data.frame(Gene = names(top100_variances), Variance = top100_variances)
@@ -83,7 +83,57 @@ ggplot(variance_df, aes(x = reorder(Gene, -Variance), y = Variance)) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
   labs(x = "Genes", y = "Variance", title = "Top 100 Variances of Genes")
+
+# Select the top 20 variances
+top20_variances <- head(sorted_variances, 20)
+
+# Get the names of the top 20 variance genes
+top20_genes <- names(top20_variances)
+
+# Filter the original DataFrame to include only the top 20 genes and the 'project_id' column
+top20_genes_df <- filtered_df[, c("project_id", top20_genes)]
+
+# Save to CSV
+write.csv(top20_genes_df, "feature_subsets/top_20_high_variance_genes.csv", row.names = FALSE)
 ```
+
+
+```{r}
+# Calculate the correlation matrix for the gene columns
+correlation_matrix <- cor(gene_columns)
+
+# Take the absolute value of the correlation matrix since we're interested in the strength of the relationship, not the direction
+abs_correlation_matrix <- abs(correlation_matrix)
+
+# Sum the absolute values of the correlations for each gene. Diagonal elements (self-correlation) are set to 0, as we don't want to include them.
+diag(abs_correlation_matrix) <- 0
+correlation_sums <- rowSums(abs_correlation_matrix)
+
+# Sort the sums of correlations and get the names of the top 1000 genes
+# which corresponds to the columns in `gene_columns`
+top_genes <- names(sort(correlation_sums, decreasing = TRUE))[1:1000]
+
+# Optional: To create a dataframe or matrix with just the top 1000 genes, you can do the following:
+top_genes_df <- gene_columns[, top_genes]
+
+top_100_genes <- names(sort(correlation_sums, decreasing = TRUE))[1:100]
+top_100_genes_df <- gene_columns[, top_100_genes]
+
+top_500_genes <- names(sort(correlation_sums, decreasing = TRUE))[1:500]
+top_500_genes_df <- gene_columns[, top_500_genes]
+```
+
+```{r}
+# Sort the sums of correlations and get the names of the top 1000 genes
+# which corresponds to the columns in `gene_columns`
+top_20_corr_genes <- names(sort(correlation_sums, decreasing = TRUE))[1:20]
+top_20_corr_genes_df <- filtered_df[, c("project_id", top_20_corr_genes)]
+
+# Save to CSV
+write.csv(top_20_corr_genes_df, "feature_subsets/top_20_correlation_genes.csv", row.names = FALSE)
+```
+
+## LASSO
 
 ```{r}
 library(knockoff)
@@ -92,30 +142,139 @@ library(knockoff)
 default_LASSO = stat.glmnet_coefdiff
 multinom_LASSO = function(X, X_k, y) default_LASSO(X, X_k, y, family = "multinomial", nlambda = 1)
 factor_project_id <- factor(filtered_df[["project_id"]])
-result = knockoff.filter(gene_columns, factor_project_id, statistic=multinom_LASSO)
+lasso_result = knockoff.filter(top_500_genes_df, factor_project_id, statistic=multinom_LASSO, fdr = 0.5)
+knockoff_LASSO_df <- filtered_df[, c("project_id", names(lasso_result$selected))]
+
+# Save to CSV
+write.csv(knockoff_LASSO_df, "feature_subsets/knockoff_LASSO_genes.csv", row.names = FALSE)
 ```
 
-```{r}
-rand_forest_result = knockoff.filter(gene_columns, factor_project_id, statistic=stat.random_forest)
-```
-
-## Stability selection
+## Random Forest
 
 ```{r}
+library(ranger)
 library(knockoff)
+
 factor_project_id <- factor(filtered_df[["project_id"]])
-result = knockoff.filter(gene_columns, factor_project_id, statistic=stat.stability_selection)
-```
 
-```{r}
+rand_forest_result = knockoff.filter(top_500_genes_df, factor_project_id, statistic=stat.random_forest, fdr = 0.1)
+length(rand_forest_result$selected)
 
+knockoff_RF_df <- filtered_df[, c("project_id", names(rand_forest_result$selected))]
+
+# Save to CSV
+write.csv(knockoff_RF_df, "feature_subsets/knockoff_RF_genes.csv", row.names = FALSE)
 ```
 
 ## Correlation Thresholding
 
+```{r}
+corr_stat = function(X, X_k, y) {
+  # One-hot encode the response variable 'y'
+  y_encoded = class.ind(as.factor(y))
+  
+  # Calculate the absolute value of the product for 'X'
+  abs_prod_X = abs(t(X) %*% y_encoded)
+  
+  # Calculate the absolute value of the product for 'X_k'
+  abs_prod_X_k = abs(t(X_k) %*% y_encoded)
+  
+  # Calculate the sum of differences between the corresponding columns for 'X' and 'X_k'
+  stat_differences = rowSums(abs(abs_prod_X) - abs(abs_prod_X_k))
+  
+  return(as.numeric(stat_differences))
+}
+
+# Auxiliary function from 'nnet' package for one-hot encoding
+class.ind = function(cl) {
+  n = length(cl)
+  n.cl = length(levels(cl))
+  clmat = matrix(0, n, n.cl)
+  clmat[(1:n) + (n * (unclass(cl) - 1))] = 1
+  colnames(clmat) = levels(cl)
+  return(clmat)
+}
+
+
+# corr_stat(gene_columns[,c(1,2,3)],gene_columns[,c(4,2,7)],factor_project_id)
+
+corr_result = knockoff.filter(top_500_genes_df, factor_project_id, statistic=corr_stat, fdr = 0.5)
+length(corr_result$selected)
+
+knockoff_corr_df <- filtered_df[, c("project_id", names(corr_result$selected))]
+
+# Save to CSV
+write.csv(knockoff_corr_df, "feature_subsets/knockoff_correlation_genes.csv", row.names = FALSE)
+```
+
 ## Variance Thresholding
 
-## Mutual Information
+```{r}
+var_stat = function(X, X_k, y) {
+  # Initialize a vector to hold the variance differences for each variable
+  p = ncol(X) # assuming X is n by p
+  variance_differences = numeric(p)
+  
+  # Calculate variance differences for each variable
+  for (j in 1:p) {
+    variance_orig = var(X[, j], na.rm = TRUE)
+    variance_knockoff = var(X_k[, j], na.rm = TRUE)
+    variance_differences[j] = (abs(variance_orig) - abs(variance_knockoff))/10^7
+  }
+  return(variance_differences)
+}
+
+var_result = knockoff.filter(top_500_genes_df, factor_project_id, statistic=var_stat, fdr = 0.5)
+length(var_result$selected)
+
+knockoff_var_df <- filtered_df[, c("project_id", names(var_result$selected))]
+
+# Save to CSV
+write.csv(knockoff_var_df, "feature_subsets/knockoff_variance_genes.csv", row.names = FALSE)
+```
+
+## Chi-Squared
+
+```{r}
+chi_stat = function(X, X_k, y) {
+  # Assuming y is a factor representing the categorical response
+  # Initialize a vector to hold statistics for each variable
+  p = dim(X)[2] # assuming X is n by p
+  stat_differences = numeric(p)
+  
+  for (j in 1:p) {
+    # Discretizing by median split for the j-th variable in both X and X_k
+    X_discrete = ifelse(X[, j] > median(X[, j]), 1, 0)
+    X_k_discrete = ifelse(X_k[, j] > median(X_k[, j]), 1, 0)
+    
+    # Chi-squared statistic calculation
+    orig_stat = chi_square_stat(X_discrete, y)
+    knockoff_stat = chi_square_stat(X_k_discrete, y)
+    
+    # Storing the difference in statistics
+    stat_differences[j] = abs(orig_stat) - abs(knockoff_stat)
+  }
+  
+  return(stat_differences)
+}
+
+# Function to calculate the Chi-squared statistic for association
+# Moved out of the original function for clarity
+chi_square_stat = function(discrete_X, y) {
+  # Construct the contingency table
+  contingency_table = table(discrete_X, y)
+  
+  # Calculate the Chi-squared statistic
+  chisq_result = chisq.test(contingency_table)
+  
+  # Get the statistic value
+  stat = chisq_result$statistic
+  return(stat)
+}
+chi_result = knockoff.filter(top_500_genes_df, factor_project_id, statistic=chi_stat)
+length(chi_result$selected)
 
 
-
+knockoff_chi_df <- filtered_df[, c("project_id", names(chi_result$selected))]
+write.csv(knockoff_chi_df, "feature_subsets/knockoff_chi_squared_genes.csv", row.names = FALSE)
+```
