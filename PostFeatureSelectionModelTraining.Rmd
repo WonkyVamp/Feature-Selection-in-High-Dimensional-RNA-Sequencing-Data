@@ -210,3 +210,46 @@ for (csv_file in csv_files) {
 
 # At this point, each dataset's results have been saved in the 'results' directory as separate CSV files.
 ```
+
+```{r}
+# Do the same for the testing data
+# Define the directory where CSV dataframes and results will be stored
+path_to_csv_directory <- "testing_csvs"
+results_directory <- "results"
+
+# Create the 'results' directory if it does not exist
+dir.create(results_directory, showWarnings = FALSE)
+
+# List all CSV files in the directory
+csv_files <- list.files(path_to_csv_directory, pattern = "\\.csv$", full.names = TRUE)
+
+# Loop over each CSV file, train and evaluate models
+for (csv_file in csv_files) {
+  # Extract the dataset name from the file name
+  dataset_name <- tools::file_path_sans_ext(basename(csv_file))
+  results_file_path <- file.path(results_directory, "test_results.csv")
+  
+  # Load existing results if the file exists
+  if (file.exists(results_file_path)) {
+    existing_results <- read.csv(results_file_path)
+  } else {
+    existing_results <- NULL
+  }
+  
+  # Read the dataset from the CSV file
+  df <- read.csv(csv_file)
+  
+  # Check if 'project_id' column exists in the dataframe
+  if (!"project_id" %in% names(df)) {
+    stop("The outcome variable 'project_id' does not exist in the dataframe: ", dataset_name)
+  }
+  
+  # Train and evaluate the models, passing in existing results if available
+  trained_models_and_results <- train_and_evaluate_models(df, "project_id", dataset_name, existing_results)
+  
+  # Now save the updated results to the 'results' directory
+  if (!is.null(trained_models_and_results$results)) {
+    write.csv(trained_models_and_results$results, results_file_path, row.names = FALSE)
+  }
+}
+```
