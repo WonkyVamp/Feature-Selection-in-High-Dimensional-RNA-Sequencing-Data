@@ -51,8 +51,6 @@ ggplot(plot_df, aes(x = PC, y = VarianceExplained)) +
   ggtitle("Importance of Top 100 Principal Components")
 
 top_25_pca <- pca_result[1:25]
-
-write.csv
 ```
 
 ## Variance Thresholding

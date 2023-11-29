@@ -1,0 +1,22 @@
+---
+title: "CreatingPCATestingSet"
+author: "Soren Dunn"
+date: "2023-11-28"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+filtered_df <- read.csv("TCGAdata/filtered_testing_set.csv")
+gene_data <- filtered_df[, !(names(filtered_df) %in% c("sample", "project_id"))]
+
+# Perform PCA and scale the data
+pca_x = prcomp(gene_data, scale = TRUE, center = TRUE)
+xnew = pca_x$x[,1:12]
+top_12_pca <- data.frame(xnew)
+top_12_pca$project_id <- filtered_df$project_id
+write.csv(top_12_pca, "testing_csvs/top_12_pca_testing.csv", row.names=FALSE)
+```

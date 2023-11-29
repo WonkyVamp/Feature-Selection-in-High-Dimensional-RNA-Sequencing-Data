@@ -128,12 +128,12 @@ save(data_3, file = "COAD_coding.RData")
 
 ```{r}
 # Load back in the subsetted data
-load("BRCA_coding.RData")
-load("other_coding.RData")
-load("COAD_coding.RData")
+load("extra_files/BRCA_coding.RData")
+load("extra_files/other_coding.RData")
+load("extra_files/COAD_coding.RData")
 "hi"
 save(data_merged, file = "merged_data.RData")
-load("merged_data.RData")
+load("extra_files/merged_data.RData")
 ```
 
 ```{r}
@@ -142,7 +142,7 @@ corr_array_2 <- TCGAanalyze_Preprocessing(data_2, filename = "corrplot_2.png", w
 corr_array_3 <- TCGAanalyze_Preprocessing(data_3, filename = "corrplot_3.png", width = 1000, height = 1000)
 combined_corr_array <- cbind(corr_array_1, corr_array_2, corr_array_3)
 normalized <- TCGAanalyze_Normalization(combined_corr_array, TCGAbiolinks:: geneInfoHT)
-
+dim(data_merged)
 # Take the transpose so that we get the data into the familiar format where
 # features are columns and the individual samples are rows
 normalized_not_filtered <- data.frame(t(normalized))
@@ -170,7 +170,7 @@ normalized_not_filtered_with_pid <- merge(
   all.x = TRUE,  # Keep all rows from normalized_not_filtered
   all.y = TRUE
 )
-
+?TCGAanalyze_Normalization
 normalized_not_filtered <- normalized_not_filtered_with_pid
 write.csv(normalized_not_filtered,"normalized_data_all.csv")
 ```
