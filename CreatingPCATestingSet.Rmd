@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-filtered_df <- read.csv("TCGAdata/filtered_testing_set.csv")
+filtered_df <- read.csv("TCGAdata/filtered_training_set.csv")
 gene_data <- filtered_df[, !(names(filtered_df) %in% c("sample", "project_id"))]
 
 # Perform PCA and scale the data

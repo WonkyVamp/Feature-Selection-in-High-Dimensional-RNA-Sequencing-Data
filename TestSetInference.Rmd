@@ -1,0 +1,407 @@
+---
+title: "TestSetInference"
+author: "Soren Dunn"
+date: "2023-11-29"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Load required packages
+library(tidyverse) # for data manipulation and plotting
+
+# Specify the path where the CSV files are stored
+folder_path <- "testing_csvs" # adjust this to your actual folder path
+
+# Read all CSV files into a list of data frames
+file_list <- list.files(path = folder_path, pattern = "\\.csv$", full.names = TRUE)
+
+# Read the csv files and store their column names
+data_sets <- lapply(file_list, function(file) {
+  data <- read.csv(file)
+  colnames(data)
+})
+
+# Obtain the unique column names across all datasets and create a matrix to track overlaps
+unique_columns <- unique(unlist(data_sets))
+overlap_matrix <- matrix(0, nrow = length(unique_columns), ncol = length(data_sets))
+rownames(overlap_matrix) <- unique_columns
+colnames(overlap_matrix) <- sprintf("dataset_%d", seq_along(data_sets))
+
+# Fill the matrix with overlap information
+for (i in seq_along(data_sets)) {
+  overlap_matrix[data_sets[[i]], i] <- 1
+}
+
+# Sum the number of datasets in which each column appears
+column_overlap_counts <- rowSums(overlap_matrix)
+
+# Now let's plot the distribution of the column overlap using ggplot2
+ggplot(data = data.frame(column = names(column_overlap_counts), overlap_count = column_overlap_counts), 
+       aes(x = overlap_count)) +
+  geom_histogram(binwidth = 1) +
+  labs(title = "Distribution of Selected Genes Across Testing Subsets",
+       x = "Number of Subsets Containing Gene",
+       y = "Selected Genes")
+```
+
+```{r}
+model_files
+```
+
+```{r}
+library(caret)
+library(ggplot2)
+
+setwd("trained_models")
+
+# List all files in the directory with "testing" in their name and .rds extension
+model_files <- list.files(pattern = "testing.*\\.RData$", full.names = TRUE)
+
+# Function to extract and plot top 3 feature importance from a model
+plot_feature_importance <- function(model, title) {
+  # Extract feature importance
+  importance <- varImp(model, scale = FALSE)$importance
+  # Convert row names into a column, since row names contain the variable names
+  importance <- data.frame(Feature = rownames(importance), Importance = importance[, 1], row.names = NULL)
+  # Sort by importance and select the top 3
+  top_importance <- head(importance[order(-importance$Importance),], 3)
+  # Create a feature importance plot
+  importance_plot <- ggplot(top_importance, aes(x = reorder(Feature, Importance), y = Importance)) +
+    geom_bar(stat = "identity") +
+    theme_minimal() +
+    xlab("Features") +
+    ylab("Importance") +
+    ggtitle(title) +
+    coord_flip() # Flip coordinates for horizontal bars
+  # Print the plot
+  print(importance_plot)
+}
+
+# Loop through each model file
+for (model_file_name in model_files) {
+  # Load the model
+  model <- readRDS(model_file_name)
+  # Generate a plot title based on the model file name
+  title <- paste("Top 3 Feature Importances")
+  # Plot top 3 feature importances, catch potential errors
+  tryCatch({
+    plot_feature_importance(model, title)
+  }, error = function(e) {
+    cat("Error in plotting feature importances for", model_file_name, ":", e$message, "\n")
+  })
+}
+```
+
+```{r}
+model_files
+```
+
+```{r}
+# Assuming that all the plot objects are stored in the all_plots list
+
+# Arrange all stored plots together with padding
+do.call(grid.arrange, c(all_plots, ncol = 2, # Adjust ncol as necessary
+                        # Specify padding and margins as you prefer
+                        bottom = unit(1, "cm"), # Adjust space at the bottom of plots
+                        top = unit(1, "cm"),    # Adjust space at the top of plots
+                        left = unit(1, "cm"),   # Adjust space on the left side of plots
+                        right = unit(1, "cm"),  # Adjust space on the right side of plots
+                        padding = unit(3, "cm") # Padding between plots
+))
+```
+
+```{r}
+# Arrange all stored plots together with different horizontal and vertical padding
+do.call(grid.arrange, c(all_plots, ncol = 2, # Adjust ncol as necessary
+                        layout_matrix = rbind(c(1, 2),
+                                              c(3, 4)), # Define layout if needed
+                        padding = unit(c(1, 1), "lines"), # Horizontal and vertical padding
+                        vp = viewport(layout = grid.layout(nrow = 2, ncol = 2, 
+                                                           widths = unit(c(1, 1), "null"), 
+                                                           heights = unit(c(1, 1), "null")))
+))
+```
+
+```{r}
+library(caret)
+library(ggplot2)
+
+setwd("trained_models")
+
+# List all files in the directory with "testing" in their name and .rds extension
+model_files <- list.files(pattern = "testing.*\\.RData$", full.names = TRUE)
+
+# Function to extract and plot top 3 feature importance from a model
+plot_feature_importance <- function(model, title) {
+  # Extract feature importance
+  importance <- varImp(model, scale = FALSE)$importance
+  # Convert row names into a column, since row names contain the variable names
+  importance <- data.frame(Feature = rownames(importance), Importance = importance[, 1], row.names = NULL)
+  # Sort by importance and select the top 3
+  top_importance <- head(importance[order(-importance$Importance),], 3)
+  # Create a feature importance plot
+  importance_plot <- ggplot(top_importance, aes(x = reorder(Feature, Importance), y = Importance)) +
+    geom_bar(stat = "identity") +
+    theme_minimal() +
+    xlab("Features") +
+    ylab("Importance") +
+    ggtitle(title) +
+    coord_flip() # Flip coordinates for horizontal bars
+  # Print the plot
+  print(importance_plot)
+}
+
+# Loop through each model file
+for (model_file_name in model_files) {
+  # Load the model
+  model <- readRDS(model_file_name)
+  # Generate a plot title based on the model file name
+  title <- paste("Top 3 Feature Importances")
+  # Plot top 3 feature importances, catch potential errors
+  tryCatch({
+    plot_feature_importance(model, title)
+  }, error = function(e) {
+    cat("Error in plotting feature importances r", model_file_name, ":", e$message, "\n")
+  })
+}
+```
+
+```{r}
+library(caret)
+library(ggplot2)
+library(dplyr) # For data manipulation
+
+setwd("trained_models")
+
+# List all files in the directory with "testing" in their name and .rds extension
+model_files <- list.files(pattern = "testing.*\\.RData$", full.names = TRUE)
+
+# Initialize an empty data frame to store top feature importance across models
+top_feature_importances <- data.frame(Feature = character(), Frequency = integer())
+
+# Function to extract and plot feature importance from a model
+plot_feature_importance <- function(model, title) {
+  # Extract feature importance
+  importance <- varImp(model, scale = FALSE)$importance
+  # Convert row names into a column, since row names contain the variable names
+  importance <- data.frame(Feature = rownames(importance), Importance = importance[, 1], row.names = NULL)
+
+  # Collect top 3 feature names
+  top_features <- head(importance[order(-importance$Importance), 'Feature'], 3)
+  top_feature_importances <<- rbind(top_feature_importances, data.frame(Feature = top_features, Frequency = 1))
+
+  # Create a feature importance plot
+  importance_plot <- ggplot(importance, aes(x = reorder(Feature, Importance), y = Importance)) +
+    geom_bar(stat = "identity") +
+    theme_minimal() +
+    xlab("Features") +
+    ylab("Importance") +
+    ggtitle(title) +
+    coord_flip() # Flip coordinates for horizontal bars
+  
+  # Print the plot
+  print(importance_plot)
+}
+
+# Loop through each model file
+for (model_file_name in model_files) {
+  # Load the model
+  model <- readRDS(model_file_name)
+  
+  # Generate a plot title based on the model file name
+  title <- paste("Feature Importances for", basename(model_file_name))
+  
+  # Plot feature importances, catch potential errors
+  tryCatch({
+    plot_feature_importance(model, title)
+  }, error = function(e) {
+    cat("Error in plotting feature importances for", model_file_name, ":", e$message, "\n")
+  })
+}
+
+# Summarize the frequency of top features across all models
+top_feature_importances_summarized <- top_feature_importances %>%
+  group_by(Feature) %>%
+  summarize(Frequency = sum(Frequency))
+
+# Plot the distribution of top features appearance across models
+ggplot(top_feature_importances_summarized, aes(x = reorder(Feature, Frequency), y = Frequency)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  theme_minimal() +
+  xlab("Features") +
+  ylab("Frequency of Top 3 Importance") +
+  ggtitle("Distribution of Top 3 Feature Importances Across Models") +
+  coord_flip() # Flip coordinates for horizontal bars
+```
+
+```{r}
+library(caret)
+library(ggplot2)
+library(dplyr)
+
+setwd("trained_models")
+
+# List all files in the directory with "testing" in their name and .rds extension
+model_files <- list.files(pattern = "testing.*\\.RDS$", full.names = TRUE)
+
+# Initialize an empty list to store top features
+top_features_list <- list()
+
+# Function to extract top 3 feature importances from a model
+extract_top_features <- function(model) {
+  # Extract feature importance
+  importance <- varImp(model, scale = FALSE)$importance
+  # Convert into a data frame and add the variable names
+  importance_df <- data.frame(Variable = rownames(importance), Importance = importance[, 1])
+  # Sort and take top 3
+  top_features <- importance_df %>% 
+    arrange(desc(Importance)) %>%
+    slice(1:3)
+  return(top_features)
+}
+
+# Loop through each model file and collect top features
+for (model_file_name in model_files) {
+  # Load the model
+  model <- readRDS(model_file_name)
+  # Extract top features, catch potential errors
+  tryCatch({
+    top_features <- extract_top_features(model)
+    # Add the model name as a column
+    top_features$model <- model_file_name
+    # Append to the list
+    top_features_list[[length(top_features_list) + 1]] <- top_features
+  }, error = function(e) {
+    cat("Error in extracting top features for", model_file_name, ":", e$message, "\n")
+  })
+}
+
+# Combine all top features into a single data frame
+all_top_features <- bind_rows(top_features_list)
+
+# Create the summary plot for top features across all models
+top_features_plot <- ggplot(all_top_features, aes(x = Variable, y = Importance)) +
+  geom_boxplot() +
+  theme_minimal() +
+  xlab("Top Features") +
+  ylab("Importance") +
+  ggtitle("Distribution of Top 3 Feature Importances Across All Models") +
+  coord_flip() # This makes it easier to read the variable names
+
+# Print the plot
+print(top_features_plot)
+```
+```{r}
+library(caret)
+library(ggplot2)
+setwd("trained_models")
+
+# Function to extract feature importance from a model
+extract_feature_importance <- function(model) {
+  importance <- varImp(model, scale = FALSE)$importance
+  importance <- data.frame(Feature = rownames(importance), Importance = importance[, 1], row.names = NULL)
+  return(importance)
+}
+
+# Initialize a list to store all feature importances
+all_importances <- list()
+
+# List all files in the directory with "testing" in their name and .rds extension
+model_files <- list.files(pattern = "testing.*\\.RData$", full.names = TRUE)
+
+# Loop through each model file
+for (model_file_name in model_files) {
+  # Load the model
+  model <- readRDS(model_file_name)
+  
+  # Extract feature importances
+  tryCatch({
+    model_importance <- extract_feature_importance(model)
+    all_importances[[model_file_name]] <- model_importance
+  }, error = function(e) {
+    cat("Error in extracting feature importances for", model_file_name, ":", e$message, "\n")
+  })
+}
+
+# Combine all feature importances into one data frame
+all_importances_df <- do.call(rbind, all_importances)
+
+# Calculate top 3 features based on maximum importance across all models
+top_features <- all_importances_df %>%
+  group_by(Feature) %>%
+  summarize(MaxImportance = max(Importance)) %>%
+  top_n(3, MaxImportance) %>%
+  pull(Feature)
+
+# Filter the importances to only include the top features
+top_features_importances <- all_importances_df %>%
+  filter(Feature %in% top_features)
+
+# Plot distribution of variable importance for top features across all models
+ggplot(top_features_importances, aes(x = Feature, y = Importance)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(x = "Top Features", y = "Importance", title = "Distribution of Top Feature Importances Across All Models") +
+  coord_flip() # for better readability
+```
+
+```{r}
+library(caret)
+library(ggplot2)
+library(dplyr)
+
+# Set the working directory to the location of your saved models
+setwd("trained_models")  # replace with the actual path
+
+# List all files in the directory with "testing" in their name and with the RDS extension
+# (the extension should be .rds if you used saveRDS to save the models)
+model_files <- list.files(pattern = "testing.*\\.RData$", full.names = TRUE)
+
+# Function to extract and plot feature importance from a model
+plot_feature_importance <- function(model, title) {
+  # Extract feature importance
+  importance_vector <- varImp(model, scale = FALSE)
+  
+  # Convert named vector to data frame
+  importance_df <- data.frame(
+    Feature = names(importance_vector),
+    Importance = unname(importance_vector)
+  )
+  
+  # Order the data frame by importance
+  importance_df <- importance_df %>%
+    arrange(desc(Importance))
+  
+  # Create a feature importance plot
+  importance_plot <- ggplot(importance_df, aes(x = reorder(Feature, Importance), y = Importance)) +
+    geom_bar(stat = "identity") +
+    theme_minimal() +
+    xlab("Features") +
+    ylab("Importance") +
+    ggtitle(title) +
+    coord_flip()  # Flip coordinates for horizontal bars
+  
+  # Print the plot
+  print(importance_plot)
+}
+
+# Loop through each model file
+for (model_file_name in model_files) {
+  # Load the model
+  model <- readRDS(model_file_name)
+  
+  # Generate a plot title based on the model file name
+  title <- paste("Feature Importances for", basename(model_file_name))
+  
+  # Plot feature importances
+  plot_feature_importance(model, title)
+}
+```
+
+```{r}
+model_files
+```

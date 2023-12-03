@@ -10,29 +10,11 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Load necessary libraries
 library(TCGAbiolinks)
-library(SummarizedExperiment)
-library(biomaRt)
-library(EDASeq)
-if (!requireNamespace("BiocManager", quietly = TRUE))
-    install.packages("BiocManager")
-BiocManager::install("SEtools")
-library(SEtools)
-```
-
-```{r}
-query = GDCquery(
-    project = "TCGA-ACC",
-    data.category = "Proteome Profiling",
-    sample.type = "Primary Tumor", 
-    legacy = FALSE)
-
-manifest <- getManifest(query)
-TCGAbiolinks:::GDCdownload.aux(
-    server = "https://api.gdc.cancer.gov/data/",
-    manifest = manifest,
-    name = "test.tar.gz",
-    path = "Test"
-)
+# library(SummarizedExperiment)
+# library(biomaRt)
+# library(EDASeq)
+# BiocManager::install("SEtools")
+# library(SEtools)
 ```
 
 ```{r}
