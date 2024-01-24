@@ -48,11 +48,7 @@ subset_and_save_csv <- function(folder1, folder2, csv_original_path) {
   }
 }
 
-subset_and_save_csv("subsets_for_testing", "testing_smaller_csvs", "TCGAdata/filtered_testing_set.csv")
-```
-
-```{r}
-filtered_df <- read.csv("TCGAdata/filtered_testing_set.csv")
+subset_and_save_csv("subsets_for_testing", "testing_csvs", "TCGAdata/filtered_testing_set.csv")
 ```
 
 ```{r}
@@ -74,44 +70,6 @@ if(nrow(filtered_df) >= 500) {
 ```
 
 ```{r}
-library(dplyr)
-library(readr)
-
-subset_and_save_csv <- function(folder1, folder2, csv_original_path) {
-  # Load the original CSV file
-  csv_original <- read_csv(csv_original_path)
-  
-  # Ensure folder1 exists and is a directory
-  if (!dir.exists(folder1)) {
-    stop("folder1 does not exist or is not a directory.")
-  }
-
-  # List all CSV files in folder1
-  files_in_folder1 <- list.files(folder1, pattern = "\\.csv$", full.names = TRUE)
-  
-  # Loop over each file in folder1
-  for (csv_path in files_in_folder1) {
-    # Read the CSV file to get the column headers
-    csv_headers <- read_csv(csv_path, n_max = 0)
-    
-    # Check which columns from folder1 are in the csv_original
-    common_cols <- intersect(names(csv_headers), names(csv_original))
-    
-    # Subset columns from the original CSV
-    subset_data <- csv_original %>%
-      select(all_of(common_cols))
-    
-    # Create the destination path in folder2 using the basename of the current file
-    dest_path <- file.path(folder2, basename(csv_path))
-    
-    # Write the subsetted data to the new CSV file in folder2
-    write_csv(subset_data, dest_path)
-    
-    # Print message
-    message("Saved subset CSV in folder2: ", dest_path)
-  }
-}
-
 subset_and_save_csv("subsets_for_testing", "testing_smaller_csvs", "TCGAdata/filtered_testing_set_subset.csv")
 ```
 

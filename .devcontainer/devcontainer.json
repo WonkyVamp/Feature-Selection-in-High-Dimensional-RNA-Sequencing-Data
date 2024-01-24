@@ -1,3 +1,8 @@
+{
+	"name": "Cancer Classification",
+	"build": {
+		"dockerfile": "Dockerfile",
+		"context": ".."
 	},
 	"customizations": {
 		"vscode": {
@@ -6,7 +11,9 @@
 			}
 		}
 	},
-	"forwardPorts": [
-		5000
-	]
+    "mounts": [
+        "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached"
+      ],
+      "postCreateCommand": "Rscript install_packages.R",
+      "shutdownAction": "stopContainer"
 }
