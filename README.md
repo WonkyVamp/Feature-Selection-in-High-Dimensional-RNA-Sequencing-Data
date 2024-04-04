@@ -8,3 +8,7 @@ Precise classification of cancer types is a central problem for cancer therapy a
 
 
 See *Feature Selection in High Dimensional RNA Sequencing Data.pdf* for details on results and methodology.
+
+Methodology : 
+
+<img width="532" alt="image" src="https://github.com/WonkyVamp/Feature-Selection-in-High-Dimensional-RNA-Sequencing-Data/assets/45623470/36de3adb-d4be-47f4-a36f-2dd54120d788">
